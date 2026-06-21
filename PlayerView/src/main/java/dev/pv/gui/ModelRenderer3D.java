@@ -25,6 +25,12 @@ public class ModelRenderer3D {
             Minecraft mc = Minecraft.getMinecraft();
             if (profile == null || mc.theWorld == null) return null;
             EntityOtherPlayerMP e = new EntityOtherPlayerMP(mc.theWorld, profile);
+            // Sample light where the local player stands (a lit lobby) so the model
+            // isn't rendered pitch-black from sitting at world origin (0,0,0).
+            if (mc.thePlayer != null) {
+                e.setLocationAndAngles(mc.thePlayer.posX, mc.thePlayer.posY,
+                        mc.thePlayer.posZ, 0f, 0f);
+            }
             e.rotationYaw = 0f;
             e.rotationPitch = 0f;
             e.rotationYawHead = 0f;

@@ -8,6 +8,9 @@ import dev.pv.util.Prestige;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.util.ResourceLocation;
 
 import java.util.Map;
 
@@ -24,6 +27,9 @@ public class GuiPlayerView extends GuiScreen {
     private boolean modelTried = false;
     private boolean model3dOk = false;
 
+    private ResourceLocation renderTex;   // server-rendered body image
+    private boolean renderTried = false;
+
     // colours
     private static final int GREEN  = 0x55FF55;
     private static final int RED     = 0xFF5555;
@@ -38,7 +44,7 @@ public class GuiPlayerView extends GuiScreen {
     private int left, top, panelW, panelH;
     private int statLeft, colW, c1, c2, c3;
 
-    private GuiButton btnCores, btnOverall;
+    private GuiButton[] modeButtons;
 
     public GuiPlayerView(BedwarsStats stats) {
         this(stats, null);
@@ -66,25 +72,34 @@ public class GuiPlayerView extends GuiScreen {
         c3 = statLeft + 2 * colW;
 
         buttonList.clear();
-        int by = top + panelH - 26;
-        btnCores = new GuiButton(0, left + panelW - 220, by, 100, 20, "Core Modes");
-        btnOverall = new GuiButton(1, left + panelW - 114, by, 100, 20, "Overall");
-        buttonList.add(btnCores);
-        buttonList.add(btnOverall);
+        Mode[] modes = Mode.values();
+        modeButtons = new GuiButton[modes.length];
+        int bw = 62, gap = 3, h = 18;
+        int total = modes.length * bw + (modes.length - 1) * gap;
+        int startX = left + (panelW - total) / 2;
+        int by = top + panelH - 24;
+        for (int i = 0; i < modes.length; i++) {
+            modeButtons[i] = new GuiButton(i, startX + i * (bw + gap), by, bw, h, modes[i].label);
+            buttonList.add(modeButtons[i]);
+        }
         updateModeButtons();
     }
 
-    /** The button for the currently-selected mode is disabled (shown highlighted/greyed). */
+    /** The button for the currently-selected mode is disabled (shown highlighted). */
     private void updateModeButtons() {
-        if (btnCores != null) btnCores.enabled = (mode != Mode.CORES);
-        if (btnOverall != null) btnOverall.enabled = (mode != Mode.OVERALL);
+        Mode[] modes = Mode.values();
+        for (int i = 0; i < modeButtons.length; i++) {
+            if (modeButtons[i] != null) modeButtons[i].enabled = (modes[i] != mode);
+        }
     }
 
     @Override
     protected void actionPerformed(GuiButton button) {
-        if (button.id == 0) mode = Mode.CORES;
-        else if (button.id == 1) mode = Mode.OVERALL;
-        updateModeButtons();
+        Mode[] modes = Mode.values();
+        if (button.id >= 0 && button.id < modes.length) {
+            mode = modes[button.id];
+            updateModeButtons();
+        }
     }
 
     @Override
@@ -115,26 +130,61 @@ public class GuiPlayerView extends GuiScreen {
         int ox = left + 12 + (64 - bodyW) / 2;
         int oy = top + 70;
         int frameBottom = oy + 32 * scale;
+        int frameH = frameBottom - oy;
 
         // subtle frame behind the figure
         drawRect(ox - 4, oy - 4, ox + bodyW + 4, frameBottom + 4, 0x30000000);
         drawRect(ox - 4, oy - 4, ox + bodyW + 4, oy - 3, 0xFF2A2A38);
         drawRect(ox - 4, frameBottom + 3, ox + bodyW + 4, frameBottom + 4, 0xFF2A2A38);
 
-        // 1) try the true 3D model
-        if (!modelTried) {
-            modelTried = true;
-            model = ModelRenderer3D.create(profile);
-        }
         boolean drew = false;
-        if (model != null) {
-            int cx = ox + bodyW / 2;
-            int feetY = frameBottom - 4;
-            model3dOk = model.draw(cx, feetY, 42, (float) mouseX, (float) mouseY);
-            drew = model3dOk;
+
+        // 1) PRIMARY: a clean, evenly-lit server-rendered body image (never dark)
+        if (!renderTried) {
+            renderTried = true;
+            if (s.bodyRender != null) {
+                try {
+                    DynamicTexture dt = new DynamicTexture(s.bodyRender);
+                    renderTex = this.mc.getTextureManager()
+                            .getDynamicTextureLocation("pv_body_" + s.uuid, dt);
+                } catch (Throwable t) {
+                    renderTex = null;
+                }
+            }
+        }
+        if (renderTex != null && s.bodyRender != null) {
+            int iw = s.bodyRender.getWidth();
+            int ih = s.bodyRender.getHeight();
+            // contain the image inside the frame box, preserving aspect ratio
+            double sc = Math.min((double) bodyW / iw, (double) frameH / ih);
+            int dw = Math.max(1, (int) (iw * sc));
+            int dh = Math.max(1, (int) (ih * sc));
+            int dx = ox + (bodyW - dw) / 2;
+            int dy = oy + (frameH - dh) / 2;
+            this.mc.getTextureManager().bindTexture(renderTex);
+            GlStateManager.color(1f, 1f, 1f, 1f);
+            GlStateManager.enableBlend();
+            GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
+            drawScaledCustomSizeModalRect(dx, dy, 0f, 0f, iw, ih, dw, dh, iw, ih);
+            GlStateManager.disableBlend();
+            drew = true;
         }
 
-        // 2) fall back to the 2D body if 3D is unavailable
+        // 2) fallback: the live 3D model
+        if (!drew) {
+            if (!modelTried) {
+                modelTried = true;
+                model = ModelRenderer3D.create(profile);
+            }
+            if (model != null) {
+                int cx = ox + bodyW / 2;
+                int feetY = frameBottom - 4;
+                model3dOk = model.draw(cx, feetY, 42, (float) mouseX, (float) mouseY);
+                drew = model3dOk;
+            }
+        }
+
+        // 3) fallback: the self-contained 2D body
         if (!drew) {
             if (!skinTried) {
                 skinTried = true;
