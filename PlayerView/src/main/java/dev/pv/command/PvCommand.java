@@ -17,6 +17,7 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 
 import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,6 +104,13 @@ public class PvCommand extends CommandBase {
                         }
                     } catch (Exception ignored) {}
 
+                    // primary skin display: a clean, evenly-lit server render (never dark).
+                    // Tries Crafatar, then Visage, then mc-heads.
+                    stats.bodyRender = fetchImage(
+                            "https://crafatar.com/renders/body/" + uuid + "?overlay&scale=10",
+                            "https://visage.surgeplay.com/full/512/" + uuid,
+                            "https://mc-heads.net/body/" + uuid + "/512");
+
                     final BedwarsStats finalStats = stats;
                     final boolean asCard = card;
                     Minecraft.getMinecraft().addScheduledTask(new Runnable() {
@@ -122,6 +130,18 @@ public class PvCommand extends CommandBase {
                 }
             }
         }, "PlayerView-fetch").start();
+    }
+
+    /** Try each URL in turn; return the first that decodes to an image, or null. */
+    private static BufferedImage fetchImage(String... urls) {
+        for (String u : urls) {
+            try {
+                byte[] bytes = dev.pv.api.HttpUtil.getBytes(u);
+                BufferedImage img = ImageIO.read(new ByteArrayInputStream(bytes));
+                if (img != null) return img;
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 
     private static void msg(final ICommandSender sender, final String text) {
