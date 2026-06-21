@@ -12,11 +12,17 @@ import java.awt.image.BufferedImage;
 public class BedwarsStats {
 
     public enum Mode {
-        OVERALL("Overall"),
-        CORES("Core Modes");
+        OVERALL("Overall", new String[]{""}),
+        CORES("Cores", new String[]{"eight_one_", "eight_two_", "four_three_", "four_four_"}),
+        SOLO("Solo", new String[]{"eight_one_"}),
+        DOUBLES("Doubles", new String[]{"eight_two_"}),
+        THREES("Threes", new String[]{"four_three_"}),
+        FOURS("Fours", new String[]{"four_four_"}),
+        FOUR_V_FOUR("4v4", new String[]{"two_four_"});
 
         public final String label;
-        Mode(String label) { this.label = label; }
+        public final String[] prefixes;
+        Mode(String label, String[] prefixes) { this.label = label; this.prefixes = prefixes; }
     }
 
     // identity
@@ -38,14 +44,11 @@ public class BedwarsStats {
     public Cosmetics cosmetics = new Cosmetics();
 
     // skin image (downloaded off-thread, uploaded to GL lazily in the GUI)
-    public BufferedImage skin;
+    public BufferedImage skin;          // raw 64x64 skin, for the local 2D fallback
+    public BufferedImage bodyRender;    // pre-rendered, always-lit body image (Crafatar/Visage)
 
     // raw bedwars stats object for per-mode lookups
     private JsonObject bw;
-
-    private static final String[] CORE_PREFIXES = {
-            "eight_one_", "eight_two_", "four_three_", "four_four_"
-    };
 
     public static BedwarsStats parse(JsonObject player, String name, String uuid) {
         BedwarsStats s = new BedwarsStats();
@@ -75,11 +78,8 @@ public class BedwarsStats {
 
     /** Read a per-mode counter, summing the four core modes when mode == CORES. */
     public long get(String suffix, Mode mode) {
-        if (mode == Mode.OVERALL) {
-            return getLong(bw, suffix);
-        }
         long total = 0;
-        for (String p : CORE_PREFIXES) total += getLong(bw, p + suffix);
+        for (String p : mode.prefixes) total += getLong(bw, p + suffix);
         return total;
     }
 
