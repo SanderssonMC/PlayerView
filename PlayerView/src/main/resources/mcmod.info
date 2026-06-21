@@ -1,0 +1,15 @@
+[
+  {
+    "modid": "playerview",
+    "name": "PlayerView",
+    "description": "View any player's Hypixel BedWars stats in-game with /pv.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "",
+    "authorList": ["you"],
+    "credits": "Stats via the Hypixel API; cosmetics via api.sukie.net.",
+    "logoFile": "",
+    "screenshots": [],
+    "dependencies": []
+  }
+]
