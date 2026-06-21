@@ -6,8 +6,7 @@ buildscript {
     }
     dependencies {
         // ForgeGradle 2.x is the toolchain used for 1.8.9. Requires JDK 8 + Gradle ~4.10.
-        classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
-    }
+classpath 'net.minecraftforge.gradle:ForgeGradle:2.1-SNAPSHOT'    }
 }
 
 apply plugin: 'net.minecraftforge.gradle.forge'
